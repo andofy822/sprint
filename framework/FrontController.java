@@ -14,6 +14,7 @@ import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServlet;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
+import jakarta.servlet.RequestDispatcher;
 
 
 public class FrontController extends HttpServlet {
@@ -30,27 +31,25 @@ public class FrontController extends HttpServlet {
     }
     protected void processRequest(HttpServletRequest req, HttpServletResponse resp) throws ServletException, IOException{
         PrintWriter out= resp.getWriter();
-        // out.println("Voici les listes des controller");
-        // for (int i = 0; i < listController.size() ; i++) {
-        //     out.println(listController.get(i));
-        // }
+        String requestURI = req.getRequestURI();
         boolean existMapping = false;
         try{
-            String urlTaper = req.getRequestURI().replace(req.getContextPath(),"");
+            String url1 = req.getHttpServletMapping().getPattern().replace("*","");
+            String urlTaper = req.getRequestURI().replace(req.getContextPath(),"").replace(url1,"");
+            urlTaper = (urlTaper.startsWith("/")) ? urlTaper : "/" + urlTaper;
             out.println("L'url taper est"+ urlTaper);
             for (String key : dicoMapping.keySet()) {
                 if (key.compareTo(urlTaper)==0) {
                     existMapping = true;
-
                     break;
                 }
             }
             if (existMapping) {
                 out.println( "Methode correpondant : "+ this.dicoMapping.get(urlTaper).getMethodName());
                 out.println( "Dans la classe : "+ this.dicoMapping.get(urlTaper).getClassName());
-                out.println(execute(dicoMapping, urlTaper));
+                execute(dicoMapping, urlTaper,req,resp);
             }
-            else{
+            else{ 
                 out.println("URL introuvable");
             }
         }
@@ -114,15 +113,28 @@ public class FrontController extends HttpServlet {
             }
         }
     }
-    public String execute(HashMap<String,Mapping> dicoMapping,String urlTaper)throws Exception{
+    public void execute(HashMap<String,Mapping> dicoMapping,String urlTaper,HttpServletRequest request,HttpServletResponse response)throws Exception{
         try{
-        Class c = Class.forName(dicoMapping.get(urlTaper).getClassName());
-        String methode = dicoMapping.get(urlTaper).getMethodName();
-        Method m = c.getMethod(methode);
-        Object o = m.invoke(c.newInstance());
-        return (String)o;
+            PrintWriter out= response.getWriter();
+            Class c = Class.forName(dicoMapping.get(urlTaper).getClassName());
+            String methode = dicoMapping.get(urlTaper).getMethodName();
+            Method m = c.getMethod(methode);
+            Object o = m.invoke(c.newInstance());
+            if (o.getClass().getTypeName().equals(String.class.getTypeName())) {
+                out.println((String)o);
+            }
+            else if (o.getClass().getTypeName().equals(ModelAndView.class.getTypeName())){
+                ModelAndView view = (ModelAndView) o ;
+                RequestDispatcher disp = request.getRequestDispatcher(view.getUrl());
+                for (String key : view.getData().keySet()) {
+                    request.setAttribute(key,view.getData().getOrDefault(key, null));
+                    
+                }   
+                disp.forward(request,response);             
+            }
         }
         catch(Exception e){
+            e.printStackTrace();
             throw e;
         }
     }
