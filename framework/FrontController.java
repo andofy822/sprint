@@ -50,11 +50,12 @@ public class FrontController extends HttpServlet {
                 execute(dicoMapping, urlTaper,req,resp);
             }
             else{ 
-                out.println("URL introuvable");
+                throw new ServletException("URL n'existe pas");
             }
         }
         catch(Exception e){
-            System.out.println(e);
+            out.println("Erreur: " + e.getMessage());
+            e.printStackTrace(out);             
             throw new ServletException(e);
         }
     }
@@ -67,15 +68,21 @@ public class FrontController extends HttpServlet {
             String name_package = sc.getInitParameter("chemin");
             this.listController =  this.getCtrlInPackage(name_package);
             System.out.println("Le size du HashMap "+dicoMapping.size());
+            if(dicoMapping.size() == 0){
+                throw new ServletException("package vide");
+            }
         } catch (Exception e) {
-            System.out.println(e);
+            throw new ServletException(e);
         }
         
     }
-    public ArrayList<String> getCtrlInPackage( String name_package) throws Exception {
+    public ArrayList<String> getCtrlInPackage( String name_package ) throws Exception {
         ClassLoader classLoader = Thread.currentThread().getContextClassLoader();
         String path = name_package.replace(".", "/");
         URL packageUrl = classLoader.getResource(path);
+        if (packageUrl == null) {
+            throw new Exception("package not exist");
+        }
         ArrayList<String> liste = new ArrayList<>();
         if (packageUrl!=null) {
             File packageFile = new File(packageUrl.getFile());
@@ -99,16 +106,20 @@ public class FrontController extends HttpServlet {
                 }
             }
             
+            
         }
     
         return liste; 
         
     }
-    public void setDicoMapping(Class c){
+    public void setDicoMapping(Class c)throws Exception{
         Method[] methodes = c.getMethods();
         for (int j = 0; j < methodes.length; j++) {
             Get annotGet = methodes[j].getAnnotation(Get.class); 
             if ( annotGet !=null ) {
+                if (dicoMapping.containsKey(annotGet.url())) {
+                    throw new Exception("url double");
+                }
                 dicoMapping.put(annotGet.url(), new Mapping( c.getName() , methodes[j].getName()));
             }
         }
@@ -120,6 +131,9 @@ public class FrontController extends HttpServlet {
             String methode = dicoMapping.get(urlTaper).getMethodName();
             Method m = c.getMethod(methode);
             Object o = m.invoke(c.newInstance());
+            if (o == null) {
+                throw new Exception("type de retour impossible");
+            }
             if (o.getClass().getTypeName().equals(String.class.getTypeName())) {
                 out.println((String)o);
             }
@@ -131,6 +145,9 @@ public class FrontController extends HttpServlet {
                     
                 }   
                 disp.forward(request,response);             
+            }
+            else{
+                throw new Exception("type de retour impossible");
             }
         }
         catch(Exception e){
