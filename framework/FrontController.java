@@ -6,6 +6,7 @@ import java.io.IOException;
 import java.io.PrintWriter;
 import java.lang.reflect.Method;
 import java.util.ArrayList;
+import java.util.Enumeration;
 import java.util.HashMap;
 
 import java.net.URL;
@@ -112,6 +113,15 @@ public class FrontController extends HttpServlet {
         return liste; 
         
     }
+    public Method getMethod(Class c,String name){
+        Method[] methodes = c.getMethods();
+        for (int i = 0; i < methodes.length; i++) {
+            if (methodes[i].getName().equals(name)) {
+                return methodes[i];
+            }
+        }
+        return null;
+    }
     public void setDicoMapping(Class c)throws Exception{
         Method[] methodes = c.getMethods();
         for (int j = 0; j < methodes.length; j++) {
@@ -129,8 +139,14 @@ public class FrontController extends HttpServlet {
             PrintWriter out= response.getWriter();
             Class c = Class.forName(dicoMapping.get(urlTaper).getClassName());
             String methode = dicoMapping.get(urlTaper).getMethodName();
-            Method m = c.getMethod(methode);
-            Object o = m.invoke(c.newInstance());
+            Method m = getMethod(c,methode);
+            Object[] ob = new Object[m.getParameterCount()];
+            Enumeration parameterNames = request.getParameterNames();
+            for (int i = 0;parameterNames.hasMoreElements() && i < ob.length ; i++) {
+                String paramName = (String)parameterNames.nextElement();
+                ob[i] = request.getParameter(paramName);
+            }
+            Object o = m.invoke(c.newInstance(),ob);
             if (o == null) {
                 throw new Exception("type de retour impossible");
             }
