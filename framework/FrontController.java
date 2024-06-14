@@ -5,6 +5,7 @@ import java.io.File;
 import java.io.IOException;
 import java.io.PrintWriter;
 import java.lang.reflect.Method;
+import java.lang.reflect.Parameter;
 import java.util.ArrayList;
 import java.util.Enumeration;
 import java.util.HashMap;
@@ -142,9 +143,18 @@ public class FrontController extends HttpServlet {
             Method m = getMethod(c,methode);
             Object[] ob = new Object[m.getParameterCount()];
             Enumeration parameterNames = request.getParameterNames();
-            for (int i = 0;parameterNames.hasMoreElements() && i < ob.length ; i++) {
-                String paramName = (String)parameterNames.nextElement();
-                ob[i] = request.getParameter(paramName);
+            Parameter [] parametre = m.getParameters();
+            while (parameterNames.hasMoreElements()) {
+                for (int i =0; i < parametre.length  ; i++) {
+                    if (parametre[i].isAnnotationPresent(Arg.class)) {
+                        Arg arg = parametre[i].getAnnotation(Arg.class);
+                        String message = arg.message();
+                        String paramName = (String)parameterNames.nextElement();
+                        if (message.equals(paramName)) {
+                            ob[i] = request.getParameter(message);
+                        }
+                    }
+                }
             }
             Object o = m.invoke(c.newInstance(),ob);
             if (o == null) {
