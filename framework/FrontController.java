@@ -10,6 +10,8 @@ import java.util.ArrayList;
 import java.util.Enumeration;
 import java.util.HashMap;
 
+import javax.sound.sampled.AudioFileFormat.Type;
+
 import java.net.URL;
 import jakarta.servlet.ServletContext;
 import jakarta.servlet.ServletException;
@@ -144,14 +146,30 @@ public class FrontController extends HttpServlet {
             Object[] ob = new Object[m.getParameterCount()];
             Enumeration parameterNames = request.getParameterNames();
             Parameter [] parametre = m.getParameters();
+            HashMap<String,Object> objet = new HashMap<String,Object>();
             while (parameterNames.hasMoreElements()) {
                 for (int i =0; i < parametre.length  ; i++) {
-                    if (parametre[i].isAnnotationPresent(Arg.class)) {
+                    String paramName = (String)parameterNames.nextElement();
+                    String [] liste_paramName = paramName.split("\\.");
+                    if (parametre[i].isAnnotationPresent(Arg.class) && parametre[i].getType().isPrimitive()) {
                         Arg arg = parametre[i].getAnnotation(Arg.class);
                         String message = arg.message();
-                        String paramName = (String)parameterNames.nextElement();
-                        if (message.equals(paramName)) {
+                        if (message.equals(liste_paramName[0])) {
                             ob[i] = request.getParameter(message);
+                        }
+                    }
+                    else if(parametre[i].isAnnotationPresent(Arg.class) && !parametre[i].getType().isPrimitive()){
+                        if (objet.containsKey(liste_paramName[0])) {
+                            Class <?> e = objet.get(liste_paramName[0]).getClass().getDeclaredField(liste_paramName[1]).getType();
+                            Method met = objet.get(liste_paramName[0]).getClass().getDeclaredMethod("set" + liste_paramName[1].substring(0,1).toUpperCase()+liste_paramName[1].substring(1) , e);
+                            met.invoke(objet.get(liste_paramName[0]), stringToType(request.getParameter(paramName), e));
+                        }
+                        else{
+                            ajout(objet,liste_paramName[0], parametre[i]);
+                            Class<?> e = objet.get(liste_paramName[0]).getClass().getDeclaredField(liste_paramName[1]).getType();
+                            Method met = objet.get(liste_paramName[0]).getClass().getDeclaredMethod("set" + liste_paramName[1].substring(0,1).toUpperCase()+liste_paramName[1].substring(1) , e);
+                            met.invoke(objet.get(liste_paramName[0]), stringToType(request.getParameter(paramName), e));
+                            ob[i]=objet.get(liste_paramName[0]);
                         }
                     }
                 }
@@ -181,5 +199,38 @@ public class FrontController extends HttpServlet {
             throw e;
         }
     }
+    public void ajout(HashMap<String,Object> objet,String parameterNames,Parameter parametre)throws Exception{
+
+             try{
+                if (parametre.isAnnotationPresent(Arg.class)) {
+                    Arg arg = parametre.getAnnotation(Arg.class);
+                    String message = arg.message();
+                    if (message.equals(parameterNames)) {
+                        Object o = parametre.getType().getConstructor().newInstance(); 
+                        objet.put(parameterNames, o);
+                    }
+                }
+
+             }
+             catch(Exception e){
+                throw e;
+             }                   
+        }
+        public  Object stringToType(String str, Class<?> clazz) {
+            if (str == null) {
+                if (clazz == Integer.class || clazz == int.class) {
+                    return 0;        
+                }
+            }
+            if (clazz == Integer.class || clazz == int.class) {
+                return  Integer.parseInt(str);
+            } else if (clazz == Double.class) {
+                return  Double.parseDouble(str);
+            } else if (clazz == Boolean.class) {
+                return  Boolean.parseBoolean(str);
+            }
+                return  str; 
+        }
+    
     
 }
