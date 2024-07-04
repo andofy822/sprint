@@ -19,6 +19,7 @@ import jakarta.servlet.http.HttpServlet;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import jakarta.servlet.RequestDispatcher;
+import jakarta.servlet.http.HttpSession;
 
 
 public class FrontController extends HttpServlet {
@@ -146,34 +147,45 @@ public class FrontController extends HttpServlet {
             Object[] ob = new Object[m.getParameterCount()];
             Enumeration parameterNames = request.getParameterNames();
             Parameter [] parametre = m.getParameters();
-            HashMap<String,Object> objet = new HashMap<String,Object>();
-            while (parameterNames.hasMoreElements()) {
-                for (int i =0; i < parametre.length  ; i++) {
+            HashMap<String,Object> objet = new HashMap<String,Object>(); 
+                while (parameterNames.hasMoreElements()) {
                     String paramName = (String)parameterNames.nextElement();
-                    String [] liste_paramName = paramName.split("\\.");
-                    if (parametre[i].isAnnotationPresent(Arg.class) && parametre[i].getType().isPrimitive()) {
-                        Arg arg = parametre[i].getAnnotation(Arg.class);
-                        String message = arg.message();
-                        if (message.equals(liste_paramName[0])) {
-                            ob[i] = request.getParameter(message);
+                    for (int i =0; i < parametre.length  ; i++) {
+                        String [] liste_paramName = paramName.split("\\.");
+                        if (parametre[i].isAnnotationPresent(Arg.class) && parametre[i].getType().isPrimitive() || parametre[i].isAnnotationPresent(Arg.class) && parametre[i].getType().getSimpleName().equalsIgnoreCase("String")) {
+                            Arg arg = parametre[i].getAnnotation(Arg.class);
+                            String message = arg.message();
+                            if (message.equals(paramName)) {
+                                ob[i] = request.getParameter(message);
+                            }
+                        } 
+                        else if(parametre[i].isAnnotationPresent(Arg.class) && !parametre[i].getType().isPrimitive() || parametre[i].isAnnotationPresent(Arg.class) && !parametre[i].getType().getSimpleName().equalsIgnoreCase("String"))
+                        {
+                            Arg arg = parametre[i].getAnnotation(Arg.class);
+                            String message = arg.message();
+                            if (message.equals(liste_paramName[0])) {
+                                if (objet.containsKey(liste_paramName[0])) {
+                                    Class <?> e = objet.get(liste_paramName[0]).getClass().getDeclaredField(liste_paramName[1]).getType();
+                                    Method met = objet.get(liste_paramName[0]).getClass().getDeclaredMethod("set" + liste_paramName[1].substring(0,1).toUpperCase()+liste_paramName[1].substring(1) , e);
+                                    met.invoke(objet.get(liste_paramName[0]), stringToType(request.getParameter(paramName), e));
+                                }
+                                else{
+                                    ajout(objet,liste_paramName[0], parametre[i]);
+                                    System.out.println(liste_paramName[0]);
+                                    Class<?> e = objet.get(liste_paramName[0]).getClass().getDeclaredField(liste_paramName[1]).getType();
+                                    Method met = objet.get(liste_paramName[0]).getClass().getDeclaredMethod("set" + liste_paramName[1].substring(0,1).toUpperCase()+liste_paramName[1].substring(1) , e);
+                                    met.invoke(objet.get(liste_paramName[0]), stringToType(request.getParameter(paramName), e));
+                                    ob[i]=objet.get(liste_paramName[0]);
+                                }
+
+                            }
                         }
-                    }
-                    else if(parametre[i].isAnnotationPresent(Arg.class) && !parametre[i].getType().isPrimitive()){
-                        if (objet.containsKey(liste_paramName[0])) {
-                            Class <?> e = objet.get(liste_paramName[0]).getClass().getDeclaredField(liste_paramName[1]).getType();
-                            Method met = objet.get(liste_paramName[0]).getClass().getDeclaredMethod("set" + liste_paramName[1].substring(0,1).toUpperCase()+liste_paramName[1].substring(1) , e);
-                            met.invoke(objet.get(liste_paramName[0]), stringToType(request.getParameter(paramName), e));
-                        }
-                        else{
-                            ajout(objet,liste_paramName[0], parametre[i]);
-                            Class<?> e = objet.get(liste_paramName[0]).getClass().getDeclaredField(liste_paramName[1]).getType();
-                            Method met = objet.get(liste_paramName[0]).getClass().getDeclaredMethod("set" + liste_paramName[1].substring(0,1).toUpperCase()+liste_paramName[1].substring(1) , e);
-                            met.invoke(objet.get(liste_paramName[0]), stringToType(request.getParameter(paramName), e));
-                            ob[i]=objet.get(liste_paramName[0]);
+                        else if(!parametre[i].isAnnotationPresent(Arg.class)){
+                            throw new Exception("ETU002365 tsy misy");
                         }
                     }
                 }
-            }
+                
             Object o = m.invoke(c.newInstance(),ob);
             if (o == null) {
                 throw new Exception("type de retour impossible");
