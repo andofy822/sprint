@@ -4,6 +4,7 @@ import framework.*;
 import java.io.File;
 import java.io.IOException;
 import java.io.PrintWriter;
+import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 import java.lang.reflect.Parameter;
 import java.util.ArrayList;
@@ -40,7 +41,7 @@ public class FrontController extends HttpServlet {
         boolean existMapping = false;
         try{
             String url1 = req.getHttpServletMapping().getPattern().replace("*","");
-            String urlTaper = req.getRequestURI().replace(req.getContextPath(),"").replace(url1,"");
+            String urlTaper = (req.getRequestURI().replace(req.getContextPath(),"")).replace(url1,"");
             urlTaper = (urlTaper.startsWith("/")) ? urlTaper : "/" + urlTaper;
             out.println("L'url taper est"+ urlTaper);
             for (String key : dicoMapping.keySet()) {
@@ -81,6 +82,7 @@ public class FrontController extends HttpServlet {
         }
         
     }
+    
     public ArrayList<String> getCtrlInPackage( String name_package ) throws Exception {
         ClassLoader classLoader = Thread.currentThread().getContextClassLoader();
         String path = name_package.replace(".", "/");
@@ -138,6 +140,7 @@ public class FrontController extends HttpServlet {
             }
         }
     }
+    
     public void execute(HashMap<String,Mapping> dicoMapping,String urlTaper,HttpServletRequest request,HttpServletResponse response)throws Exception{
         try{
             PrintWriter out= response.getWriter();
@@ -147,10 +150,22 @@ public class FrontController extends HttpServlet {
             Object[] ob = new Object[m.getParameterCount()];
             Enumeration parameterNames = request.getParameterNames();
             Parameter [] parametre = m.getParameters();
-            HashMap<String,Object> objet = new HashMap<String,Object>(); 
+            HashMap<String,Object> objet = new HashMap<String,Object>();
+            HttpSession session = request.getSession();
+            CustomSession cust = new CustomSession();
+            cust.set(session);
+            if (!parameterNames.hasMoreElements()) {
+                for (int i =0; i < parametre.length  ; i++){
+                    if(!parametre[i].isAnnotationPresent(Arg.class) && parametre[i].getType().getSimpleName().equalsIgnoreCase("CustomSession")){
+                        ob[i] = cust;
+                    }
+                }
+            } 
+            else{
                 while (parameterNames.hasMoreElements()) {
                     String paramName = (String)parameterNames.nextElement();
                     for (int i =0; i < parametre.length  ; i++) {
+                        
                         String [] liste_paramName = paramName.split("\\.");
                         if (parametre[i].isAnnotationPresent(Arg.class) && parametre[i].getType().isPrimitive() || parametre[i].isAnnotationPresent(Arg.class) && parametre[i].getType().getSimpleName().equalsIgnoreCase("String")) {
                             Arg arg = parametre[i].getAnnotation(Arg.class);
@@ -158,6 +173,9 @@ public class FrontController extends HttpServlet {
                             if (message.equals(paramName)) {
                                 ob[i] = request.getParameter(message);
                             }
+                        }
+                        else if(!parametre[i].isAnnotationPresent(Arg.class) && parametre[i].getType().getSimpleName().equalsIgnoreCase("CustomSession")){
+                            ob[i] = cust;
                         } 
                         else if(parametre[i].isAnnotationPresent(Arg.class) && !parametre[i].getType().isPrimitive() || parametre[i].isAnnotationPresent(Arg.class) && !parametre[i].getType().getSimpleName().equalsIgnoreCase("String"))
                         {
@@ -185,8 +203,10 @@ public class FrontController extends HttpServlet {
                         }
                     }
                 }
-                
-            Object o = m.invoke(c.newInstance(),ob);
+            }
+            Object f = c.newInstance();
+            checkSession(f,cust);    
+            Object o = m.invoke(f,ob);
             if (o == null) {
                 throw new Exception("type de retour impossible");
             }
@@ -208,6 +228,19 @@ public class FrontController extends HttpServlet {
         }
         catch(Exception e){
             e.printStackTrace();
+            throw e;
+        }
+    }
+    public void checkSession(Object c,CustomSession session)throws Exception{
+        try {
+            Field[] fields = c.getClass().getDeclaredFields();
+            for (int i = 0; i < fields.length; i++) {
+            if (fields[i].getType().getSimpleName().equalsIgnoreCase("CustomSession")) {
+                fields[i].setAccessible(true);
+                fields[i].set(c,session);
+            }
+        }
+        } catch (Exception e) {
             throw e;
         }
     }
