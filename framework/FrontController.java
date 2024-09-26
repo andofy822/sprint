@@ -13,6 +13,8 @@ import java.util.HashMap;
 
 import javax.sound.sampled.AudioFileFormat.Type;
 
+import com.google.gson.Gson;
+
 import java.net.URL;
 import jakarta.servlet.ServletContext;
 import jakarta.servlet.ServletException;
@@ -36,14 +38,14 @@ public class FrontController extends HttpServlet {
         processRequest(req, resp);
     }
     protected void processRequest(HttpServletRequest req, HttpServletResponse resp) throws ServletException, IOException{
-        PrintWriter out= resp.getWriter();
+        // PrintWriter out= resp.getWriter();
         String requestURI = req.getRequestURI();
         boolean existMapping = false;
         try{
             String url1 = req.getHttpServletMapping().getPattern().replace("*","");
             String urlTaper = (req.getRequestURI().replace(req.getContextPath(),"")).replace(url1,"");
             urlTaper = (urlTaper.startsWith("/")) ? urlTaper : "/" + urlTaper;
-            out.println("L'url taper est"+ urlTaper);
+            // out.println("L'url taper est"+ urlTaper);
             for (String key : dicoMapping.keySet()) {
                 if (key.compareTo(urlTaper)==0) {
                     existMapping = true;
@@ -51,8 +53,8 @@ public class FrontController extends HttpServlet {
                 }
             }
             if (existMapping) {
-                out.println( "Methode correpondant : "+ this.dicoMapping.get(urlTaper).getMethodName());
-                out.println( "Dans la classe : "+ this.dicoMapping.get(urlTaper).getClassName());
+                // out.println( "Methode correpondant : "+ this.dicoMapping.get(urlTaper).getMethodName());
+                // out.println( "Dans la classe : "+ this.dicoMapping.get(urlTaper).getClassName());
                 execute(dicoMapping, urlTaper,req,resp);
             }
             else{ 
@@ -60,8 +62,8 @@ public class FrontController extends HttpServlet {
             }
         }
         catch(Exception e){
-            out.println("Erreur: " + e.getMessage());
-            e.printStackTrace(out);             
+            // out.println("Erreur: " + e.getMessage());
+            // e.printStackTrace(out);             
             throw new ServletException(e);
         }
     }
@@ -82,7 +84,6 @@ public class FrontController extends HttpServlet {
         }
         
     }
-    
     public ArrayList<String> getCtrlInPackage( String name_package ) throws Exception {
         ClassLoader classLoader = Thread.currentThread().getContextClassLoader();
         String path = name_package.replace(".", "/");
@@ -131,7 +132,7 @@ public class FrontController extends HttpServlet {
     public void setDicoMapping(Class c)throws Exception{
         Method[] methodes = c.getMethods();
         for (int j = 0; j < methodes.length; j++) {
-            Get annotGet = methodes[j].getAnnotation(Get.class); 
+            Get annotGet = methodes[j].getAnnotation(Get.class);
             if ( annotGet !=null ) {
                 if (dicoMapping.containsKey(annotGet.url())) {
                     throw new Exception("url double");
@@ -140,6 +141,13 @@ public class FrontController extends HttpServlet {
             }
         }
     }
+    public boolean checkApi(Method m){
+        Restapi annotGet = m.getAnnotation(Restapi.class);
+        if (annotGet != null) {
+            return true;
+        }
+        return false;
+    }
     
     public void execute(HashMap<String,Mapping> dicoMapping,String urlTaper,HttpServletRequest request,HttpServletResponse response)throws Exception{
         try{
@@ -147,6 +155,7 @@ public class FrontController extends HttpServlet {
             Class c = Class.forName(dicoMapping.get(urlTaper).getClassName());
             String methode = dicoMapping.get(urlTaper).getMethodName();
             Method m = getMethod(c,methode);
+            boolean api = checkApi(m);
             Object[] ob = new Object[m.getParameterCount()];
             Enumeration parameterNames = request.getParameterNames();
             Parameter [] parametre = m.getParameters();
@@ -205,26 +214,43 @@ public class FrontController extends HttpServlet {
                 }
             }
             Object f = c.newInstance();
-            checkSession(f,cust);    
+            checkSession(f,cust);
             Object o = m.invoke(f,ob);
-            if (o == null) {
-                throw new Exception("type de retour impossible");
-            }
-            if (o.getClass().getTypeName().equals(String.class.getTypeName())) {
-                out.println((String)o);
-            }
-            else if (o.getClass().getTypeName().equals(ModelAndView.class.getTypeName())){
-                ModelAndView view = (ModelAndView) o ;
-                RequestDispatcher disp = request.getRequestDispatcher(view.getUrl());
-                for (String key : view.getData().keySet()) {
-                    request.setAttribute(key,view.getData().getOrDefault(key, null));
-                    
-                }   
-                disp.forward(request,response);             
+            Gson json = new Gson();
+            if (api) {
+                response.setContentType("text/json");
+                if (o == null) {
+                    throw new Exception("type de retour impossible");
+                }
+                else if (o.getClass().getTypeName().equals(ModelAndView.class.getTypeName())){
+                    ModelAndView view = (ModelAndView) o ;
+                    out.println(json.toJson(view.getData()));                
+                }
+                else{
+                    out.println(json.toJson(o));
+                }
             }
             else{
-                throw new Exception("type de retour impossible");
-            }
+                if (o == null) {
+                    throw new Exception("type de retour impossible");
+                }
+                if (o.getClass().getTypeName().equals(String.class.getTypeName())) {
+                    out.println((String)o);
+                }
+                else if (o.getClass().getTypeName().equals(ModelAndView.class.getTypeName())){
+                    ModelAndView view = (ModelAndView) o ;
+                    RequestDispatcher disp = request.getRequestDispatcher(view.getUrl());
+                    for (String key : view.getData().keySet()) {
+                        request.setAttribute(key,view.getData().getOrDefault(key, null));
+                        
+                    }   
+                    disp.forward(request,response);             
+                }
+                else{
+                    throw new Exception("type de retour impossible");
+                }
+
+            }    
         }
         catch(Exception e){
             e.printStackTrace();
