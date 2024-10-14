@@ -131,13 +131,26 @@ public class FrontController extends HttpServlet {
     }
     public void setDicoMapping(Class c)throws Exception{
         Method[] methodes = c.getMethods();
+        ArrayList<VerbAction> liste = new ArrayList<>(); 
         for (int j = 0; j < methodes.length; j++) {
             Get annotGet = methodes[j].getAnnotation(Get.class);
             if ( annotGet !=null ) {
                 if (dicoMapping.containsKey(annotGet.url())) {
                     throw new Exception("url double");
                 }
-                dicoMapping.put(annotGet.url(), new Mapping( c.getName() , methodes[j].getName()));
+                if(methodes[j].isAnnotationPresent(MethodGet.class)){
+                    VerbAction verb = new VerbAction("GET",methodes[j].getName());
+                    if () {
+                        
+                    }
+                    liste.add(verb);
+                }
+                if(methodes[j].isAnnotationPresent(MethodPost.class)){
+                    VerbAction verb = new VerbAction("POST",methodes[j].getName());
+                    liste.add(verb);
+                }
+                Mapping map = new Mapping(c.getName(),liste);
+                dicoMapping.put(annotGet.url(), map);
             }
         }
     }
@@ -153,7 +166,8 @@ public class FrontController extends HttpServlet {
         try{
             PrintWriter out= response.getWriter();
             Class c = Class.forName(dicoMapping.get(urlTaper).getClassName());
-            String methode = dicoMapping.get(urlTaper).getMethodName();
+            String verbe = request.getMethod(); 
+            String methode = dicoMapping.get(urlTaper).getMethodeName(verbe);
             Method m = getMethod(c,methode);
             boolean api = checkApi(m);
             Object[] ob = new Object[m.getParameterCount()];
