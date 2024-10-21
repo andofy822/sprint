@@ -58,7 +58,8 @@ public class FrontController extends HttpServlet {
                 execute(dicoMapping, urlTaper,req,resp);
             }
             else{ 
-                throw new ServletException("URL n'existe pas");
+                // throw new ServletException("URL n'existe pas");
+                resp.sendError(404,new Exception("URL n'existe pas").getMessage());
             }
         }
         catch(Exception e){
@@ -140,9 +141,6 @@ public class FrontController extends HttpServlet {
                 }
                 if(methodes[j].isAnnotationPresent(MethodGet.class)){
                     VerbAction verb = new VerbAction("GET",methodes[j].getName());
-                    if () {
-                        
-                    }
                     liste.add(verb);
                 }
                 if(methodes[j].isAnnotationPresent(MethodPost.class)){
