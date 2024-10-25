@@ -197,6 +197,9 @@ public class FrontController extends HttpServlet {
                         }
                         else if(!parametre[i].isAnnotationPresent(Arg.class) && parametre[i].getType().getSimpleName().equalsIgnoreCase("CustomSession")){
                             ob[i] = cust;
+                        }
+                        else if(parametre[i].isAnnotationPresent(Arg.class) && !parametre[i].getType().isPrimitive() || parametre[i].isAnnotationPresent(Arg.class) && !parametre[i].getType().getSimpleName().equalsIgnoreCase("Part")){
+                            ob[i]= request.getPart(paramName);
                         } 
                         else if(parametre[i].isAnnotationPresent(Arg.class) && !parametre[i].getType().isPrimitive() || parametre[i].isAnnotationPresent(Arg.class) && !parametre[i].getType().getSimpleName().equalsIgnoreCase("String"))
                         {
