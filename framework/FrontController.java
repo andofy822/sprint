@@ -5,12 +5,16 @@ import java.io.File;
 import java.io.IOException;
 import java.io.PrintWriter;
 import java.lang.reflect.Field;
+import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.lang.reflect.Parameter;
 import java.util.ArrayList;
 import java.util.Enumeration;
 import java.util.HashMap;
-
+import java.io.ByteArrayOutputStream;
+import java.io.IOException;
+import java.io.InputStream;
+import jakarta.servlet.http.Part;
 import javax.sound.sampled.AudioFileFormat.Type;
 
 import com.google.gson.Gson;
@@ -18,13 +22,14 @@ import com.google.gson.Gson;
 import java.net.URL;
 import jakarta.servlet.ServletContext;
 import jakarta.servlet.ServletException;
+import jakarta.servlet.annotation.MultipartConfig;
 import jakarta.servlet.http.HttpServlet;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import jakarta.servlet.RequestDispatcher;
 import jakarta.servlet.http.HttpSession;
 
-
+@MultipartConfig
 public class FrontController extends HttpServlet {
     // Ho an'ny sprint 1,2
     ArrayList<String> listController;
@@ -38,14 +43,12 @@ public class FrontController extends HttpServlet {
         processRequest(req, resp);
     }
     protected void processRequest(HttpServletRequest req, HttpServletResponse resp) throws ServletException, IOException{
-        // PrintWriter out= resp.getWriter();
         String requestURI = req.getRequestURI();
         boolean existMapping = false;
         try{
             String url1 = req.getHttpServletMapping().getPattern().replace("*","");
             String urlTaper = (req.getRequestURI().replace(req.getContextPath(),"")).replace(url1,"");
             urlTaper = (urlTaper.startsWith("/")) ? urlTaper : "/" + urlTaper;
-            // out.println("L'url taper est"+ urlTaper);
             for (String key : dicoMapping.keySet()) {
                 if (key.compareTo(urlTaper)==0) {
                     existMapping = true;
@@ -53,18 +56,14 @@ public class FrontController extends HttpServlet {
                 }
             }
             if (existMapping) {
-                // out.println( "Methode correpondant : "+ this.dicoMapping.get(urlTaper).getMethodName());
-                // out.println( "Dans la classe : "+ this.dicoMapping.get(urlTaper).getClassName());
                 execute(dicoMapping, urlTaper,req,resp);
             }
             else{ 
                 // throw new ServletException("URL n'existe pas");
-                resp.sendError(404,new Exception("URL n'existe pas").getMessage());
+                resp.sendError(404, "URL n'existe pas");
             }
         }
-        catch(Exception e){
-            // out.println("Erreur: " + e.getMessage());
-            // e.printStackTrace(out);             
+        catch(Exception e){             
             throw new ServletException(e);
         }
     }
@@ -116,10 +115,8 @@ public class FrontController extends HttpServlet {
             }
             
             
-        }
-    
-        return liste; 
-        
+        } 
+        return liste;      
     }
     public Method getMethod(Class c,String name){
         Method[] methodes = c.getMethods();
@@ -137,20 +134,31 @@ public class FrontController extends HttpServlet {
             Get annotGet = methodes[j].getAnnotation(Get.class);
             if ( annotGet !=null ) {
                 if (dicoMapping.containsKey(annotGet.url())) {
-                    throw new Exception("url double");
+                    Mapping map = new Mapping();
+                    map = dicoMapping.get(annotGet.url());
+                    map.getVerbeMethodeDouble(methodes[j]);      
                 }
                 if(methodes[j].isAnnotationPresent(MethodGet.class)){
-                    VerbAction verb = new VerbAction("GET",methodes[j].getName());
+                    VerbAction verb = new VerbAction("GET",methodes[j]);
                     liste.add(verb);
                 }
                 if(methodes[j].isAnnotationPresent(MethodPost.class)){
-                    VerbAction verb = new VerbAction("POST",methodes[j].getName());
+                    VerbAction verb = new VerbAction("POST",methodes[j]);
                     liste.add(verb);
                 }
                 Mapping map = new Mapping(c.getName(),liste);
                 dicoMapping.put(annotGet.url(), map);
             }
         }
+    }
+    public String getVerb(Method method)throws Exception{
+        if (method.isAnnotationPresent(MethodGet.class)) {
+            return "GET";
+        }
+        if (method.isAnnotationPresent(MethodPost.class)) {
+            return "POST";
+        }
+        return null;
     }
     public boolean checkApi(Method m){
         Restapi annotGet = m.getAnnotation(Restapi.class);
@@ -164,12 +172,14 @@ public class FrontController extends HttpServlet {
         try{
             PrintWriter out= response.getWriter();
             Class c = Class.forName(dicoMapping.get(urlTaper).getClassName());
-            String verbe = request.getMethod(); 
+            String verbe = request.getMethod();
+            System.out.println(urlTaper); 
             String methode = dicoMapping.get(urlTaper).getMethodeName(verbe);
             Method m = getMethod(c,methode);
             boolean api = checkApi(m);
             Object[] ob = new Object[m.getParameterCount()];
-            Enumeration parameterNames = request.getParameterNames();
+            Enumeration<String> parameterNames = request.getParameterNames();
+            System.out.println(parameterNames.hasMoreElements());
             Parameter [] parametre = m.getParameters();
             HashMap<String,Object> objet = new HashMap<String,Object>();
             HttpSession session = request.getSession();
@@ -183,50 +193,9 @@ public class FrontController extends HttpServlet {
                 }
             } 
             else{
-                while (parameterNames.hasMoreElements()) {
-                    String paramName = (String)parameterNames.nextElement();
-                    for (int i =0; i < parametre.length  ; i++) {
-                        
-                        String [] liste_paramName = paramName.split("\\.");
-                        if (parametre[i].isAnnotationPresent(Arg.class) && parametre[i].getType().isPrimitive() || parametre[i].isAnnotationPresent(Arg.class) && parametre[i].getType().getSimpleName().equalsIgnoreCase("String")) {
-                            Arg arg = parametre[i].getAnnotation(Arg.class);
-                            String message = arg.message();
-                            if (message.equals(paramName)) {
-                                ob[i] = request.getParameter(message);
-                            }
-                        }
-                        else if(!parametre[i].isAnnotationPresent(Arg.class) && parametre[i].getType().getSimpleName().equalsIgnoreCase("CustomSession")){
-                            ob[i] = cust;
-                        }
-                        else if(parametre[i].isAnnotationPresent(Arg.class) && !parametre[i].getType().isPrimitive() || parametre[i].isAnnotationPresent(Arg.class) && !parametre[i].getType().getSimpleName().equalsIgnoreCase("Part")){
-                            ob[i]= request.getPart(paramName);
-                        } 
-                        else if(parametre[i].isAnnotationPresent(Arg.class) && !parametre[i].getType().isPrimitive() || parametre[i].isAnnotationPresent(Arg.class) && !parametre[i].getType().getSimpleName().equalsIgnoreCase("String"))
-                        {
-                            Arg arg = parametre[i].getAnnotation(Arg.class);
-                            String message = arg.message();
-                            if (message.equals(liste_paramName[0])) {
-                                if (objet.containsKey(liste_paramName[0])) {
-                                    Class <?> e = objet.get(liste_paramName[0]).getClass().getDeclaredField(liste_paramName[1]).getType();
-                                    Method met = objet.get(liste_paramName[0]).getClass().getDeclaredMethod("set" + liste_paramName[1].substring(0,1).toUpperCase()+liste_paramName[1].substring(1) , e);
-                                    met.invoke(objet.get(liste_paramName[0]), stringToType(request.getParameter(paramName), e));
-                                }
-                                else{
-                                    ajout(objet,liste_paramName[0], parametre[i]);
-                                    System.out.println(liste_paramName[0]);
-                                    Class<?> e = objet.get(liste_paramName[0]).getClass().getDeclaredField(liste_paramName[1]).getType();
-                                    Method met = objet.get(liste_paramName[0]).getClass().getDeclaredMethod("set" + liste_paramName[1].substring(0,1).toUpperCase()+liste_paramName[1].substring(1) , e);
-                                    met.invoke(objet.get(liste_paramName[0]), stringToType(request.getParameter(paramName), e));
-                                    ob[i]=objet.get(liste_paramName[0]);
-                                }
-
-                            }
-                        }
-                        else if(!parametre[i].isAnnotationPresent(Arg.class)){
-                            throw new Exception("ETU002365 tsy misy");
-                        }
-                    }
-                }
+                    new Util().traitementSimple(parameterNames, parametre, ob, request, cust);
+                    Enumeration<String> parameterNames1 = request.getParameterNames();
+                    new Util().traitementObjet(parameterNames1, parametre, ob, request, cust, objet);
             }
             Object f = c.newInstance();
             checkSession(f,cust);
@@ -272,6 +241,8 @@ public class FrontController extends HttpServlet {
             throw e;
         }
     }
+    
+    
     public void checkSession(Object c,CustomSession session)throws Exception{
         try {
             Field[] fields = c.getClass().getDeclaredFields();
@@ -285,23 +256,7 @@ public class FrontController extends HttpServlet {
             throw e;
         }
     }
-    public void ajout(HashMap<String,Object> objet,String parameterNames,Parameter parametre)throws Exception{
-
-             try{
-                if (parametre.isAnnotationPresent(Arg.class)) {
-                    Arg arg = parametre.getAnnotation(Arg.class);
-                    String message = arg.message();
-                    if (message.equals(parameterNames)) {
-                        Object o = parametre.getType().getConstructor().newInstance(); 
-                        objet.put(parameterNames, o);
-                    }
-                }
-
-             }
-             catch(Exception e){
-                throw e;
-             }                   
-        }
+    
         public  Object stringToType(String str, Class<?> clazz) {
             if (str == null) {
                 if (clazz == Integer.class || clazz == int.class) {

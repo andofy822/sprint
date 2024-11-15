@@ -1,24 +1,26 @@
 package framework;
 
+import java.lang.reflect.Method;
+
 public class VerbAction {
     String verb;
-    String action;
+    Method action;
     public String getVerb() {
         return verb;
     }
     public void setVerb(String verb) {
         this.verb = verb;
     }
-    public String getAction() {
+    public Method getAction() {
         return action;
     }
-    public void setAction(String action) {
+    public void setAction(Method action) {
         this.action = action;
     }
     public VerbAction(){
 
     }
-    public VerbAction(String verb,String action){
+    public VerbAction(String verb,Method action){
         this.verb= verb;
         this.action = action;
     }
