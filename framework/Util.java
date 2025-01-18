@@ -48,7 +48,7 @@ public class Util {
             throw e;
         }
     }
-    public void traitementObjet(Enumeration<String> listeParameter,Parameter [] parametre,Object[] ob,HttpServletRequest request,CustomSession cust,HashMap<String,Object> objet)throws Exception{
+    public void traitementObjet(Enumeration<String> listeParameter,Parameter [] parametre,Object[] ob,HttpServletRequest request,CustomSession cust,HashMap<String,Object> objet,HashMap<String,String> error)throws Exception{
         try {
                 while (listeParameter.hasMoreElements()) {
                     String paramName = (String)listeParameter.nextElement();
@@ -61,14 +61,14 @@ public class Util {
                                 if (objet.containsKey(liste_paramName[0])) {
                                     Class <?> e = objet.get(liste_paramName[0]).getClass().getDeclaredField(liste_paramName[1]).getType();
                                     Method met = objet.get(liste_paramName[0]).getClass().getDeclaredMethod("set" + liste_paramName[1].substring(0,1).toUpperCase()+liste_paramName[1].substring(1) , e);
-                                    met.invoke(objet.get(liste_paramName[0]), stringToType(request.getParameter(paramName), e));
+                                    met.invoke(objet.get(liste_paramName[0]), stringToType(request.getParameter(paramName),liste_paramName[1], e,error));
                                     ob[j]=objet.get(liste_paramName[0]);
                                 }
                                 else{
                                     ajout(objet,liste_paramName[0], parametre[j]);
                                     Class<?> e = objet.get(liste_paramName[0]).getClass().getDeclaredField(liste_paramName[1]).getType();
                                     Method met = objet.get(liste_paramName[0]).getClass().getDeclaredMethod("set" + liste_paramName[1].substring(0,1).toUpperCase()+liste_paramName[1].substring(1) , e);
-                                    met.invoke(objet.get(liste_paramName[0]), stringToType(request.getParameter(paramName), e));
+                                    met.invoke(objet.get(liste_paramName[0]), stringToType(request.getParameter(paramName),liste_paramName[1], e,error));
                                     ob[j]=objet.get(liste_paramName[0]);
                                 }
                         }
@@ -78,7 +78,7 @@ public class Util {
                     Object obj = objet.get(key);
                     System.out.println(key);
                     System.out.println(obj.getClass().getSimpleName());
-                    this.validation(obj);
+                    validation(obj,error);
                 }
                 String contentType = request.getContentType();
                 if (contentType != null && contentType.toLowerCase().startsWith("multipart/form-data")) {
@@ -166,16 +166,33 @@ public class Util {
             throw new Exception("Erreur lors de la lecture du contenu du fichier", e);
         }
     }
-    public  Object stringToType(String str, Class<?> clazz) {
-        if (str == null) {
+    public  Object stringToType(String str,String nomField, Class<?> clazz,HashMap<String,String> error) throws Exception {
+        if (str == null || str.trim().compareTo("")==0 || str.compareTo("null")==0) {
             if (clazz == Integer.class || clazz == int.class) {
+                addError(nomField, nomField +" doit pas etre null", error);
+                return 0;        
+            }
+            if (clazz == Double.class || clazz == double.class) {
+                addError(nomField, nomField +" doit pas etre null", error);
                 return 0;        
             }
         }
         if (clazz == Integer.class || clazz == int.class) {
-            return  Integer.parseInt(str);
-        } else if (clazz == Double.class) {
-            return  Double.parseDouble(str);
+            try {
+              int a = Integer.parseInt(str);
+              return a;
+            } catch (Exception e) {
+                addError(nomField, nomField +" doit  etre int", error);
+                return 0;
+            }
+        } else if (clazz == Double.class || clazz == double.class) {
+            try {
+                double a = Double.parseDouble(str);
+                return a;
+              } catch (Exception e) {
+                addError(nomField, nomField +" doit  etre double", error);
+                  return 0;
+              }
         } else if (clazz == Boolean.class) {
             return  Boolean.parseBoolean(str);
         }
@@ -197,19 +214,28 @@ public class Util {
            throw e;
         }                   
    }
-   public void validation(Object object)throws Exception{
-        StringBuffer Exception = new StringBuffer();
-        try {
+   public void addError(String key,String object,HashMap<String,String> error)throws Exception{
+    try {
+        if (!error.containsKey(key)) {
+            error.put(key, object);
+        }
+    } catch (Exception e) {
+        throw e;
+    }
+
+   }
+   public void validation(Object object,HashMap<String,String> error)throws Exception{
+    try {
             Field [] fields = object.getClass().getDeclaredFields();
             for (Field field : fields) {
                 field.setAccessible(true);
                 if (field.isAnnotationPresent(NotNull.class)) {
                     Object ob = field.get(object);
                     if (field.getType().getSimpleName().equalsIgnoreCase("String") && ob != null && ((String) ob).isEmpty()) {
-                        Exception.append(field.getName()+"null");
+                        addError(field.getName(), field.getName()+"null", error);
                     }
                     if (ob == null) {
-                        Exception.append(field.getName()+"null");
+                        addError(field.getName(), field.getName()+"null", error);
                     }
                 }
                 if (field.isAnnotationPresent(Range.class)) {
@@ -217,16 +243,13 @@ public class Util {
                     Range range = field.getAnnotation(Range.class);
                     System.out.println(ob.getClass().getSimpleName());
                     if (ob.getClass().getSimpleName().compareToIgnoreCase("Integer")!=0 && ob.getClass().getSimpleName().compareToIgnoreCase("Double")!=0) {
-                        Exception.append(field.getName()+"doit etre de type int ou double");
+                        addError(field.getName(), field.getName()+" doit etre double", error);
+
                     }
                     if (Double.parseDouble(ob.toString()) < range.min() || Double.parseDouble(ob.toString()) > range.max()) {
-                        Exception.append(field.getName()+"doit etre entre " +range.min() +"et"+range.max());
+                        addError(field.getName(), field.getName()+"doit etre entre " +range.min() +"et"+range.max(), error);
                     }
                 }
-            }
-            System.out.println(Exception.toString());
-            if (Exception.length() > 0) {
-                throw new Exception(Exception.toString());    
             }
         } catch (Exception e) {
             throw new Exception(e);
