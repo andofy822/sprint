@@ -25,6 +25,7 @@ import jakarta.servlet.ServletException;
 import jakarta.servlet.annotation.MultipartConfig;
 import jakarta.servlet.http.HttpServlet;
 import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletRequestWrapper;
 import jakarta.servlet.http.HttpServletResponse;
 import jakarta.servlet.RequestDispatcher;
 import jakarta.servlet.http.HttpSession;
@@ -36,7 +37,7 @@ public class FrontController extends HttpServlet {
     HashMap<String,Mapping> dicoMapping = new HashMap<String,Mapping>() ;//Clé ny URL ,d mapping ny value
     @Override
     protected void doGet(HttpServletRequest req, HttpServletResponse resp) throws ServletException, IOException {
-        processRequest(req, resp);
+         processRequest(req, resp);
     }
     @Override
     protected void doPost(HttpServletRequest req, HttpServletResponse resp) throws ServletException, IOException {
@@ -129,14 +130,17 @@ public class FrontController extends HttpServlet {
     }
     public void setDicoMapping(Class c)throws Exception{
         Method[] methodes = c.getMethods();
-        ArrayList<VerbAction> liste = new ArrayList<>(); 
         for (int j = 0; j < methodes.length; j++) {
+         ArrayList<VerbAction> liste = new ArrayList<>(); 
+
             Get annotGet = methodes[j].getAnnotation(Get.class);
-            if ( annotGet !=null ) {
+            if ( annotGet != null ) {
                 if (dicoMapping.containsKey(annotGet.url())) {
+                    System.out.println("nandalo tato svaahf");
                     Mapping map = new Mapping();
                     map = dicoMapping.get(annotGet.url());
-                    map.getVerbeMethodeDouble(methodes[j]);      
+                    map.getVerbeMethodeDouble(methodes[j]);
+                    continue;      
                 }
                 if(methodes[j].isAnnotationPresent(MethodGet.class)){
                     VerbAction verb = new VerbAction("GET",methodes[j]);
@@ -144,6 +148,10 @@ public class FrontController extends HttpServlet {
                 }
                 if(methodes[j].isAnnotationPresent(MethodPost.class)){
                     VerbAction verb = new VerbAction("POST",methodes[j]);
+                    liste.add(verb);
+                }
+                if(!methodes[j].isAnnotationPresent(MethodPost.class) && !methodes[j].isAnnotationPresent(MethodGet.class)){
+                    VerbAction verb = new VerbAction("GET",methodes[j]);
                     liste.add(verb);
                 }
                 Mapping map = new Mapping(c.getName(),liste);
@@ -173,9 +181,8 @@ public class FrontController extends HttpServlet {
             PrintWriter out= response.getWriter();
             Class c = Class.forName(dicoMapping.get(urlTaper).getClassName());
             String verbe = request.getMethod();
-            System.out.println(urlTaper); 
-            String methode = dicoMapping.get(urlTaper).getMethodeName(verbe);
-            Method m = getMethod(c,methode);
+            Method m = dicoMapping.get(urlTaper).getMethodeName(verbe);
+            System.out.println(m.getName());
             boolean api = checkApi(m);
             Object[] ob = new Object[m.getParameterCount()];
             Enumeration<String> parameterNames = request.getParameterNames();
@@ -184,6 +191,7 @@ public class FrontController extends HttpServlet {
             HashMap<String,Object> objet = new HashMap<String,Object>();
             HttpSession session = request.getSession();
             CustomSession cust = new CustomSession();
+            HashMap<String,String> validationError = new HashMap<>();
             cust.set(session);
             if (!parameterNames.hasMoreElements()) {
                 for (int i =0; i < parametre.length  ; i++){
@@ -195,7 +203,7 @@ public class FrontController extends HttpServlet {
             else{
                     new Util().traitementSimple(parameterNames, parametre, ob, request, cust);
                     Enumeration<String> parameterNames1 = request.getParameterNames();
-                    new Util().traitementObjet(parameterNames1, parametre, ob, request, cust, objet);
+                    new Util().traitementObjet(parameterNames1, parametre, ob, request, cust, objet,validationError);
             }
             Object f = c.newInstance();
             checkSession(f,cust);
@@ -223,10 +231,30 @@ public class FrontController extends HttpServlet {
                 }
                 else if (o.getClass().getTypeName().equals(ModelAndView.class.getTypeName())){
                     ModelAndView view = (ModelAndView) o ;
+                    view.setError(validationError);
+                    System.out.println(view.getError().toString());
+                    if (view.getError().size() > 0) 
+                        {
+                            if (!verbe.equalsIgnoreCase("GET")) {
+                                HttpServletRequest warpedRequest = new HttpServletRequestWrapper(request){
+                                    @Override
+                                    public String getMethod(){
+                                        return "GET";
+                                    }
+                                };
+                                request.setAttribute("error",view.getError());
+                                RequestDispatcher disp = warpedRequest.getRequestDispatcher(view.getErrorUrl());
+                                disp.forward(warpedRequest,response);
+                                return;
+                            }
+                        request.setAttribute("error",view.getError());
+                        RequestDispatcher disp = request.getRequestDispatcher(view.getErrorUrl());
+                        disp.forward(request,response);
+                        return;    
+                    }
                     RequestDispatcher disp = request.getRequestDispatcher(view.getUrl());
                     for (String key : view.getData().keySet()) {
                         request.setAttribute(key,view.getData().getOrDefault(key, null));
-                        
                     }   
                     disp.forward(request,response);             
                 }
@@ -235,7 +263,7 @@ public class FrontController extends HttpServlet {
                 }
 
             }    
-        }
+    }
         catch(Exception e){
             e.printStackTrace();
             throw e;

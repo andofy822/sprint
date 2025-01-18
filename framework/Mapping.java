@@ -36,20 +36,20 @@ public class Mapping {
         }
         throw new Exception("methode non correspondant");
     }
-    public String getMethodeName(String verb)throws Exception{
+    public Method getMethodeName(String verb)throws Exception{
         try {
             for (VerbAction verbeAction : listeMethode ) {
-                if (verbeAction.getVerb().equals(verb)) {
-                    return verbeAction.getAction().getName();
+                if (verbeAction.getVerb().compareToIgnoreCase(verb)==0) {
+                    return verbeAction.getAction();
                 }
             } 
-            throw new Exception("methode non correspondant"+ verb);
-
+           throw new Exception("methode not allowed"+verb);
         } catch (Exception e) {
             throw e;
         }
+
     }
-    public void getVerbeMethodeDouble(Method method)throws Exception{
+    public String getVerbeMethodeDouble(Method method)throws Exception{
         try {
             String verbe = "";
             if (method.isAnnotationPresent(MethodGet.class)) {
@@ -57,15 +57,17 @@ public class Mapping {
             }
             else if (method.isAnnotationPresent(MethodPost.class)) {
                 verbe = "POST";
+                System.out.println("nandalo tato");
             }
             else{
-                verbe=null;
+                verbe="GET";
             }
             for (VerbAction verbeAction : listeMethode ) {
                 if (verbeAction.getVerb().equals(verbe)) {
                     throw new Exception("url double");
                 }
             }
+            return verbe;
         } catch (Exception e) {
             // TODO: handle exception
             throw e;
