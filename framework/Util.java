@@ -232,10 +232,10 @@ public class Util {
                 if (field.isAnnotationPresent(NotNull.class)) {
                     Object ob = field.get(object);
                     if (field.getType().getSimpleName().equalsIgnoreCase("String") && ob != null && ((String) ob).isEmpty()) {
-                        addError(field.getName(), field.getName()+"null", error);
+                        addError(field.getName(), field.getName()+"ne doit pas etre null", error);
                     }
                     if (ob == null) {
-                        addError(field.getName(), field.getName()+"null", error);
+                        addError(field.getName(), field.getName()+"ne doit pas etre null", error);
                     }
                 }
                 if (field.isAnnotationPresent(Range.class)) {
@@ -247,7 +247,7 @@ public class Util {
 
                     }
                     if (Double.parseDouble(ob.toString()) < range.min() || Double.parseDouble(ob.toString()) > range.max()) {
-                        addError(field.getName(), field.getName()+"doit etre entre " +range.min() +"et"+range.max(), error);
+                        addError(field.getName(), field.getName()+" doit etre entre " +range.min() +" et "+range.max(), error);
                     }
                 }
             }
@@ -255,6 +255,7 @@ public class Util {
             throw new Exception(e);
         }
    }
+   
    public void sendErrorNotFound(HttpServletRequest request,HttpServletResponse response,String exception)throws Exception{
     response.setStatus(HttpServletResponse.SC_NOT_FOUND); // Sets 404 status code
     response.setContentType("text/html;charset=UTF-8");

@@ -43,7 +43,7 @@ public class Mapping {
                     return verbeAction.getAction();
                 }
             } 
-           throw new Exception("methode not allowed"+verb);
+           throw new Exception("methode non corespondant par la methode" + verb);
         } catch (Exception e) {
             throw e;
         }
