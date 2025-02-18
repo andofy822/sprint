@@ -34,6 +34,8 @@ import jakarta.servlet.http.HttpSession;
 public class FrontController extends HttpServlet {
     // Ho an'ny sprint 1,2
     ArrayList<String> listController;
+    String rolename;
+    String validate;
     HashMap<String,Mapping> dicoMapping = new HashMap<String,Mapping>() ;//Clé ny URL ,d mapping ny value
     @Override
     protected void doGet(HttpServletRequest req, HttpServletResponse resp) throws ServletException, IOException {
@@ -74,6 +76,8 @@ public class FrontController extends HttpServlet {
         super.init();
         try {
             ServletContext sc = getServletContext();
+            rolename = sc.getInitParameter("RoleAttributName");
+            validate = sc.getInitParameter("RoleAttributValidation");
             String name_package = sc.getInitParameter("chemin");
             this.listController =  this.getCtrlInPackage(name_package);
             System.out.println("Le size du HashMap "+dicoMapping.size());
@@ -182,6 +186,7 @@ public class FrontController extends HttpServlet {
             Class c = Class.forName(dicoMapping.get(urlTaper).getClassName());
             String verbe = request.getMethod();
             Method m = dicoMapping.get(urlTaper).getMethodeName(verbe);
+            verifierAuthentification(m, request, response);
             System.out.println(m.getName());
             boolean api = checkApi(m);
             Object[] ob = new Object[m.getParameterCount()];
@@ -269,8 +274,6 @@ public class FrontController extends HttpServlet {
             throw e;
         }
     }
-    
-    
     public void checkSession(Object c,CustomSession session)throws Exception{
         try {
             Field[] fields = c.getClass().getDeclaredFields();
@@ -300,6 +303,27 @@ public class FrontController extends HttpServlet {
             }
                 return  str; 
         }
-    
+        public boolean verifierAuthentification(Method method,HttpServletRequest request,HttpServletResponse response)throws Exception{
+            try {
+                if (method.isAnnotationPresent(Auth.class)) {
+                    Auth annotation = (Auth)method.getAnnotation(Auth.class);
+                    String [] roles = annotation.role();
+                    System.out.println(request.getSession().getAttribute(rolename));
+                    System.out.println(request.getSession().getAttribute(validate));
+                    if (request.getSession().getAttribute(rolename)!= null && request.getSession().getAttribute(validate)!= null) {
+                        
+                        for (int i = 0; i < roles.length; i++) {
+                            if (roles[i].compareToIgnoreCase((String)request.getSession().getAttribute(rolename))==0 && (boolean)request.getSession().getAttribute(validate)) {
+                                return true;
+                            }
+                        }
+                    }
+                    throw new  Exception("utilisateur non authentifie pour cette methode");
+                }
+                return false;
+            } catch (Exception e) {
+                throw e;
+            }
+       }
     
 }
