@@ -7,6 +7,9 @@ import java.io.PrintWriter;
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 import java.lang.reflect.Parameter;
+import java.sql.Timestamp;
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.Enumeration;
@@ -56,7 +59,9 @@ public class Util {
                     for (int j = 0; j < parametre.length; j++) {
                         Arg arg = parametre[j].getAnnotation(Arg.class);
                         String message = arg.message();
-                        if(parametre[j].isAnnotationPresent(Arg.class) && !parametre[j].getType().isPrimitive() || parametre[j].isAnnotationPresent(Arg.class) && !parametre[j].getType().getSimpleName().equalsIgnoreCase("String"))
+                        if((parametre[j].isAnnotationPresent(Arg.class) && !parametre[j].getType().isPrimitive()) && (parametre[j].isAnnotationPresent(Arg.class) && !parametre[j].getType().getSimpleName().equalsIgnoreCase("String")))
+                        {
+                            System.out.println("gferygfrfyegu :" + parametre[j].getType().getSimpleName());
                             if (message.equals(liste_paramName[0])) {
                                 if (objet.containsKey(liste_paramName[0])) {
                                     Class <?> e = objet.get(liste_paramName[0]).getClass().getDeclaredField(liste_paramName[1]).getType();
@@ -72,6 +77,8 @@ public class Util {
                                     ob[j]=objet.get(liste_paramName[0]);
                                 }
                         }
+                    }
+                        
                     }
                 }
                 for (String key : objet.keySet()) {
@@ -185,7 +192,18 @@ public class Util {
                 addError(nomField, nomField +" doit  etre int", error);
                 return 0;
             }
-        } else if (clazz == Double.class || clazz == double.class) {
+        }
+        else if (clazz == Timestamp.class) {
+            try {
+                LocalDateTime daty = LocalDateTime.parse(str, DateTimeFormatter.ISO_LOCAL_DATE_TIME); 
+                Timestamp time = java.sql.Timestamp.valueOf(daty);
+                return time;   
+            } catch (Exception e) {
+                addError(nomField, nomField + "  " + e.getMessage(), error);
+                return null;
+            }
+        } 
+        else if (clazz == Double.class || clazz == double.class) {
             try {
                 double a = Double.parseDouble(str);
                 return a;
